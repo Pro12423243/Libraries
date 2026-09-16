@@ -1,1 +1,1100 @@
 
+
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+
+local THEME = {
+	Font = Enum.Font.Cartoon,
+	TextColor = Color3.fromRGB(255, 255, 255),
+
+	WindowBackground = Color3.fromRGB(249, 253, 255),
+	TopBarColor = Color3.fromRGB(83, 84, 84),
+	SideTabsColor = Color3.fromRGB(34, 34, 34),
+	SideTabsTransparency = 0.2,
+
+	StrokeColor = Color3.fromRGB(255, 255, 255),      
+	OuterStrokeColor = Color3.fromRGB(0, 0, 0),        
+	ComponentStrokeColor = Color3.fromRGB(0, 0, 0),    
+
+	StrokeThickness = 2.2,
+	ComponentStrokeThickness = 1,
+
+	PlaceholderImage = "rbxasset://textures/ui/GuiImagePlaceholder.png",
+
+	AccentGradient = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 20)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(83, 83, 83)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 20, 20)),
+	}),
+
+	WindowDarkGradient = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(31, 31, 31)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 0, 0)),
+	}),
+
+	TabTextGradient = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(214, 214, 214)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(74, 74, 74)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(214, 214, 214)),
+	}),
+
+	ComponentBgGradient = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(26, 26, 26)),
+		ColorSequenceKeypoint.new(0.51, Color3.fromRGB(42, 42, 42)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(26, 26, 26)),
+	}),
+
+	ComponentTextGradient = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(214, 214, 214)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(74, 74, 74)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(214, 214, 214)),
+	}),
+
+	TogglePillGradient = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(121, 122, 122)),
+		ColorSequenceKeypoint.new(0.5, Color3.fromRGB(202, 203, 205)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(121, 122, 122)),
+	}),
+	TogglePillColor = Color3.fromRGB(253, 255, 255),
+
+	TitleBgColor = Color3.fromRGB(0, 0, 0),
+	TitleBgTransparency = 0.8,
+
+	ZeroTransparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(1, 0),
+	}),
+}
+
+local sfxclick = nil	
+
+--=====================================================================
+-- UTILS
+--=====================================================================
+local function create(className, props, children)
+	local inst = Instance.new(className)
+	for prop, value in pairs(props or {}) do
+		inst[prop] = value
+	end
+	for _, child in ipairs(children or {}) do
+		child.Parent = inst
+	end
+	return inst
+end
+
+local function addCorner(instance, radius)
+	return create("UICorner", { CornerRadius = radius, Parent = instance })
+end
+
+local function addPlainStroke(instance, thickness, color)
+	return create("UIStroke", {
+		Thickness = thickness,
+		Color = color,
+		Parent = instance,
+	})
+end
+
+local function addGradientStroke(instance, thickness, color, rotation, colorSeq)
+	local stroke = create("UIStroke", {
+		Thickness = thickness,
+		Color = color,
+		Parent = instance,
+	})
+	create("UIGradient", {
+		Enabled = true,
+		Rotation = rotation,
+		Offset = Vector2.new(0, 0),
+		Color = colorSeq,
+		Transparency = THEME.ZeroTransparency,
+		Parent = stroke,
+	})
+	return stroke
+end
+
+local function addGradient(instance, rotation, colorSeq)
+	return create("UIGradient", {
+		Enabled = true,
+		Rotation = rotation,
+		Offset = Vector2.new(0, 0),
+		Color = colorSeq,
+		Transparency = THEME.ZeroTransparency,
+		Parent = instance,
+	})
+end
+
+local function addShadow(instance, blurRadius, color, transparency, offset, spread, zindex)
+	pcall(function()
+		create("UIShadow", {
+			Enabled = true,
+			BlurRadius = blurRadius or UDim.new(0, 12),
+			Color = color or Color3.fromRGB(0, 0, 0),
+			Transparency = transparency or 0.5,
+			Offset = offset or UDim2.new(0, 0, 0, 4),
+			Spread = spread or UDim2.new(0, 0, 0, 0),
+			ZIndex = zindex or 1,
+			Parent = instance,
+		})
+	end)
+end
+
+local UserInputService = game:GetService("UserInputService")
+
+local function makeDraggable(dragHandle, target)
+	local dragging = false
+	local dragStart, startPos
+
+	dragHandle.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = target.Position
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging
+			and (input.UserInputType == Enum.UserInputType.MouseMovement
+				or input.UserInputType == Enum.UserInputType.Touch) then
+			local delta = input.Position - dragStart
+			target.Position = UDim2.new(
+				startPos.X.Scale, startPos.X.Offset + delta.X,
+				startPos.Y.Scale, startPos.Y.Offset + delta.Y
+			)
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+end
+
+local function makeAutoScrollingFrame(scrollingFrame, listProps)
+	scrollingFrame.ScrollBarThickness = 0
+	scrollingFrame.ScrollBarImageTransparency = 1
+	scrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+	local list = create("UIListLayout", {
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		FillDirection = Enum.FillDirection.Vertical,
+		HorizontalAlignment = Enum.HorizontalAlignment.Left,
+		VerticalAlignment = Enum.VerticalAlignment.Top,
+		Padding = UDim.new(0, 2),
+		Parent = scrollingFrame,
+	})
+
+	if listProps then
+		for prop, value in pairs(listProps) do
+			list[prop] = value
+		end
+	end
+
+	return list
+end
+
+
+local function newComponentContainer(parent, name, height, layoutOrder)
+	return create("Frame", {
+		Name = name,
+		Size = UDim2.new(1, 0, 0, height),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		LayoutOrder = layoutOrder,
+		Parent = parent,
+	})
+end
+
+local function newDarkCard(parent, size, position, anchorPoint)
+	local card = create("Frame", {
+		Name = "Card",
+		Size = size or UDim2.new(0.95, 0, 0.95, 0),
+		Position = position or UDim2.new(0.5, 0, 0.5, 0),
+		AnchorPoint = anchorPoint or Vector2.new(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 0,
+		BorderSizePixel = 0,
+		Parent = parent,
+	})
+	addGradient(card, 0, THEME.ComponentBgGradient)
+	addPlainStroke(card, THEME.ComponentStrokeThickness, THEME.ComponentStrokeColor)
+	addCorner(card, UDim.new(0, 8))
+	return card
+end
+
+local function newGradientText(parent, props)
+	props = props or {}
+	local label = create("TextLabel", {
+		Name = props.Name or "TextLabel",
+		Size = props.Size or UDim2.new(1, 0, 1, 0),
+		Position = props.Position or UDim2.new(0.5, 0, 0.5, 0),
+		AnchorPoint = props.AnchorPoint or Vector2.new(0.5, 0.5),
+		BackgroundTransparency = 1,
+		Text = props.Text or "Label",
+		TextColor3 = THEME.TextColor,
+		TextSize = props.TextSize or 17,
+		Font = THEME.Font,
+		TextXAlignment = props.TextXAlignment or Enum.TextXAlignment.Center,
+		TextYAlignment = props.TextYAlignment or Enum.TextYAlignment.Center,
+		Parent = parent,
+	})
+	addGradient(label, 26, THEME.ComponentTextGradient)
+	return label
+end
+
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local TWEEN_INFO = TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+
+local Tab = {}
+Tab.__index = Tab
+
+function Tab:AddTitleText(text)
+	self._componentCount = self._componentCount + 1
+
+	local frame = create("Frame", {
+		Name = "TitleText",
+		Size = UDim2.new(1, 0, 0, 32),
+		BackgroundColor3 = THEME.TitleBgColor,
+		BackgroundTransparency = THEME.TitleBgTransparency,
+		BorderSizePixel = 0,
+		LayoutOrder = self._componentCount,
+		Parent = self.Page,
+	})
+	addCorner(frame, UDim.new(0, 8))
+	newGradientText(frame, { Text = text, TextSize = 17 })
+
+	return frame
+end
+
+function Tab:AddSimpleButton(text, callback)
+	self._componentCount = self._componentCount + 1
+	local container = newComponentContainer(self.Page, "BaseButton", 40, self._componentCount)
+
+	local btn = create("ImageButton", {
+		Name = "ImageButton",
+		Size = UDim2.new(0.95, 0, 0.95, 0),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 0,
+		BorderSizePixel = 0,
+		Image = THEME.PlaceholderImage,
+		ImageColor3 = Color3.fromRGB(255, 255, 255),
+		ImageTransparency = 1,
+		ScaleType = Enum.ScaleType.Stretch,
+		AutoButtonColor = false,
+		Parent = container,
+	})
+	addGradient(btn, 0, THEME.ComponentBgGradient)
+	addPlainStroke(btn, THEME.ComponentStrokeThickness, THEME.ComponentStrokeColor)
+	addCorner(btn, UDim.new(0, 8))
+	newGradientText(btn, { Text = text, TextSize = 17 })
+
+	btn.MouseButton1Click:Connect(function()
+		sfxclick:Play()
+		if typeof(callback) == "function" then
+			task.spawn(callback)
+		end
+	end)
+
+	return container
+end
+Tab.AddBaseButton = Tab.AddSimpleButton
+
+function Tab:AddToggle(text, valueId, default)
+	local COLOR_ON = THEME.TogglePillColor or Color3.fromRGB(0, 170, 255)
+	local COLOR_OFF = Color3.fromRGB(35, 35, 45)
+
+	local STROKE_ON = THEME.ToggleStrokeColor or Color3.fromRGB(255, 255, 255)
+	local STROKE_OFF = THEME.ComponentStrokeColor or Color3.fromRGB(60, 60, 70)
+
+	local values = self.Window.Values
+	if values[valueId] == nil then
+		values[valueId] = default or false
+	end
+
+	self._componentCount = self._componentCount + 1
+	local container = newComponentContainer(self.Page, "Toggle", 40, self._componentCount)
+
+	local bar = newDarkCard(container)
+
+	newGradientText(bar, {
+		Name = "TextLabel",
+		Size = UDim2.new(0.679, 0, 1, 0),
+		Position = UDim2.new(0.34, 0, 0.5, 0),
+		Text = text,
+		TextSize = 16,
+	})
+
+	local toggleContain = create("Frame", {
+		Name = "ToggleContain",
+		Size = UDim2.new(0.267, 0, 0.829, 0),
+		Position = UDim2.new(0.84, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = COLOR_OFF,
+		BackgroundTransparency = 0,
+		BorderSizePixel = 0,
+		Parent = bar,
+	})
+
+	local toggleStroke = addPlainStroke(toggleContain, THEME.ComponentStrokeThickness, STROKE_OFF)
+	addGradient(toggleContain, 0, THEME.TogglePillGradient)
+	addCorner(toggleContain, UDim.new(0, 8))
+
+	local stateLabel = newGradientText(toggleContain, { Text = "OFF", TextSize = 16 })
+
+	local clickButton = create("TextButton", {
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 1,
+		Text = "",
+		ZIndex = 5,
+		Parent = bar,
+	})
+
+	local function refresh(animate)
+		local on = values[valueId]
+		stateLabel.Text = on and "ON" or "OFF"
+
+		local targetBgColor = on and COLOR_ON or COLOR_OFF
+		local targetStrokeColor = on and STROKE_ON or STROKE_OFF
+
+		if animate then
+			TweenService:Create(toggleContain, TWEEN_INFO, { BackgroundColor3 = targetBgColor }):Play()
+			if toggleStroke then
+				TweenService:Create(toggleStroke, TWEEN_INFO, { Color = targetStrokeColor }):Play()
+			end
+		else
+			toggleContain.BackgroundColor3 = targetBgColor
+			if toggleStroke then
+				toggleStroke.Color = targetStrokeColor
+			end
+		end
+	end
+
+	refresh(false)
+
+	clickButton.MouseButton1Click:Connect(function()
+		sfxclick:Play()
+		values[valueId] = not values[valueId]
+		refresh(true)
+	end)
+
+	return container
+end
+
+function Tab:AddDropDownSingleSelect(text, options, valueId, default)
+	local values = self.Window.Values
+	options = options or {}
+	if values[valueId] == nil then
+		values[valueId] = default or options[1]
+	end
+
+	self._componentCount = self._componentCount + 1
+
+	local container = create("Frame", {
+		Name = "DropDown_" .. tostring(valueId),
+		Size = UDim2.new(1, 0, 0, 40),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundTransparency = 1,
+		LayoutOrder = self._componentCount,
+		Parent = self.Page,
+	})
+
+	create("UIListLayout", {
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 4),
+		Parent = container,
+	})
+
+	local headerWrap = create("Frame", {
+		Name = "HeaderWrap",
+		Size = UDim2.new(1, 0, 0, 40),
+		BackgroundTransparency = 1,
+		LayoutOrder = 1,
+		Parent = container,
+	})
+	local header = newDarkCard(headerWrap)
+
+	newGradientText(header, {
+		Name = "Label",
+		Size = UDim2.new(0.5, 0, 1, 0),
+		Position = UDim2.new(0, 12, 0.5, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		Text = text,
+		TextSize = 15,
+		TextXAlignment = Enum.TextXAlignment.Left,
+	})
+
+	local valueLabel = newGradientText(header, {
+		Name = "Value",
+		Size = UDim2.new(0.35, 0, 1, 0),
+		Position = UDim2.new(1, -36, 0.5, 0),
+		AnchorPoint = Vector2.new(1, 0.5),
+		Text = tostring(values[valueId]),
+		TextSize = 14,
+		TextXAlignment = Enum.TextXAlignment.Right,
+	})
+
+	local arrow = create("ImageLabel", {
+		Name = "ArrowIcon",
+		Size = UDim2.new(0, 16, 0, 16),
+		Position = UDim2.new(1, -12, 0.5, 0),
+		AnchorPoint = Vector2.new(1, 0.5),
+		BackgroundTransparency = 1,
+		Image = "rbxassetid://11552476728",
+		ImageColor3 = Color3.fromRGB(200, 200, 200),
+		Rotation = 0,
+		Parent = header,
+	})
+
+	local clickButton = create("TextButton", {
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 1,
+		Text = "",
+		ZIndex = 5,
+		Parent = header,
+	})
+
+	local optionHeight = 32
+	local optionPadding = 3
+	local totalOptionsHeight = (#options * optionHeight) + (math.max(0, #options - 1) * optionPadding)
+
+	local optionsList = create("CanvasGroup", {
+		Name = "Options",
+		Size = UDim2.new(1, 0, 0, 0),
+		BackgroundTransparency = 1,
+		GroupTransparency = 1,
+		ClipsDescendants = true,
+		Visible = false,
+		LayoutOrder = 2,
+		Parent = container,
+	})
+
+	create("UIListLayout", {
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, optionPadding),
+		Parent = optionsList,
+	})
+
+	local optionButtons = {}
+	local isOpen = false
+
+	local function refreshSelected()
+		for optionValue, optCard in pairs(optionButtons) do
+			local selected = (optionValue == values[valueId])
+			local targetStroke = selected and Color3.fromRGB(255, 255, 255) or THEME.ComponentStrokeColor
+			local targetTransparency = selected and 0.2 or 0.5
+
+			TweenService:Create(optCard.UIStroke, TWEEN_INFO, { Color = targetStroke }):Play()
+			TweenService:Create(optCard, TWEEN_INFO, { BackgroundTransparency = targetTransparency }):Play()
+		end
+		valueLabel.Text = tostring(values[valueId])
+	end
+
+	local function closeDropdown()
+		isOpen = false
+		TweenService:Create(arrow, TWEEN_INFO, { Rotation = 0 }):Play()
+		TweenService:Create(optionsList, TWEEN_INFO, { Size = UDim2.new(1, 0, 0, 0), GroupTransparency = 1 }):Play()
+		task.delay(0.3, function()
+			if not isOpen then
+				optionsList.Visible = false
+			end
+		end)
+	end
+
+	local function openDropdown()
+		isOpen = true
+		optionsList.Visible = true
+		TweenService:Create(arrow, TWEEN_INFO, { Rotation = 180 }):Play()
+		TweenService:Create(optionsList, TWEEN_INFO, { Size = UDim2.new(1, 0, 0, totalOptionsHeight), GroupTransparency = 0 }):Play()
+	end
+
+	for i, optionValue in ipairs(options) do
+		local optWrap = create("Frame", {
+			Name = "OptionWrap_" .. tostring(optionValue),
+			Size = UDim2.new(1, 0, 0, optionHeight),
+			BackgroundTransparency = 1,
+			LayoutOrder = i,
+			Parent = optionsList,
+		})
+
+		local optCard = newDarkCard(optWrap)
+		newGradientText(optCard, { 
+			Text = tostring(optionValue), 
+			TextSize = 14,
+			Position = UDim2.new(0, 12, 0.5, 0),
+			AnchorPoint = Vector2.new(0, 0.5),
+			TextXAlignment = Enum.TextXAlignment.Left
+		})
+
+		optionButtons[optionValue] = optCard
+
+		local optClick = create("TextButton", {
+			Size = UDim2.new(1, 0, 1, 0),
+			BackgroundTransparency = 1,
+			Text = "",
+			ZIndex = 5,
+			Parent = optCard,
+		})
+
+		optClick.MouseEnter:Connect(function()
+			if values[valueId] ~= optionValue then
+				TweenService:Create(optCard, TWEEN_INFO, { BackgroundTransparency = 0.3 }):Play()
+			end
+		end)
+
+		optClick.MouseLeave:Connect(function()
+			if values[valueId] ~= optionValue then
+				TweenService:Create(optCard, TWEEN_INFO, { BackgroundTransparency = 0.5 }):Play()
+			end
+		end)
+
+		optClick.MouseButton1Click:Connect(function()
+			sfxclick:Play()
+			values[valueId] = optionValue
+			refreshSelected()
+			closeDropdown()
+		end)
+	end
+
+	refreshSelected()
+
+	clickButton.MouseButton1Click:Connect(function()
+		sfxclick:Play()
+		if isOpen then
+			closeDropdown()
+		else
+			openDropdown()
+		end
+	end)
+
+	return container
+end
+
+function Tab:_buildInputBase(name, text, initialText, filterType)
+	self._componentCount = self._componentCount + 1
+	local container = newComponentContainer(self.Page, name, 40, self._componentCount)
+	local bar = newDarkCard(container)
+
+	newGradientText(bar, {
+		Name = "TextLabel",
+		Size = UDim2.new(0.679, 0, 1, 0),
+		Position = UDim2.new(0.34, 0, 0.5, 0),
+		Text = text,
+		TextSize = 16,
+	})
+
+	local inputContain = create("Frame", {
+		Name = "InputContain",
+		Size = UDim2.new(0.267, 0, 0.829, 0),
+		Position = UDim2.new(0.84, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = THEME.TogglePillColor or Color3.fromRGB(35, 35, 45),
+		BackgroundTransparency = 0,
+		BorderSizePixel = 0,
+		Parent = bar,
+	})
+	local inputStroke = addPlainStroke(inputContain, THEME.ComponentStrokeThickness, THEME.ComponentStrokeColor)
+	addGradient(inputContain, 0, THEME.TogglePillGradient)
+	addCorner(inputContain, UDim.new(0, 8))
+
+	local box = create("TextBox", {
+		Name = "Box",
+		Size = UDim2.new(1, -12, 1, 0),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundTransparency = 1,
+		Text = initialText,
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		Font = THEME.Font,
+		TextSize = 15,
+		ClearTextOnFocus = false,
+		ZIndex = 5,
+		Parent = inputContain,
+	})
+
+	if filterType then
+		box:GetPropertyChangedSignal("Text"):Connect(function()
+			if filterType == "int" then
+				box.Text = box.Text:gsub("[^%d-]", "")
+			elseif filterType == "float" then
+				box.Text = box.Text:gsub("[^%d.-]", "")
+			end
+		end)
+	end
+
+	box.Focused:Connect(function()
+		TweenService:Create(inputStroke, TWEEN_INFO, { Color = Color3.fromRGB(255, 255, 255) }):Play()
+	end)
+	box.FocusLost:Connect(function()
+		TweenService:Create(inputStroke, TWEEN_INFO, { Color = THEME.ComponentStrokeColor }):Play()
+	end)
+
+	return container, box
+end
+
+function Tab:AddInputInt(text, valueId, default)
+	local values = self.Window.Values
+	if values[valueId] == nil then
+		values[valueId] = default or 0
+	end
+
+	local container, box = self:_buildInputBase("InputInt_" .. tostring(valueId), text, tostring(values[valueId]), "int")
+
+	box.FocusLost:Connect(function()
+		local n = tonumber(box.Text)
+		if n then 
+			values[valueId] = math.floor(n) 
+		end
+		box.Text = tostring(values[valueId])
+	end)
+
+	return container
+end
+
+function Tab:AddInputString(text, valueId, default)
+	local values = self.Window.Values
+	if values[valueId] == nil then
+		values[valueId] = default or ""
+	end
+
+	local container, box = self:_buildInputBase("InputString_" .. tostring(valueId), text, tostring(values[valueId]), nil)
+
+	box.FocusLost:Connect(function()
+		values[valueId] = box.Text
+	end)
+
+	return container
+end
+
+function Tab:AddInputFloat(text, valueId, default)
+	local values = self.Window.Values
+	if values[valueId] == nil then
+		values[valueId] = default or 0
+	end
+
+	local container, box = self:_buildInputBase("InputFloat_" .. tostring(valueId), text, tostring(values[valueId]), "float")
+
+	box.FocusLost:Connect(function()
+		local n = tonumber(box.Text)
+		if n then 
+			values[valueId] = n 
+		end
+		box.Text = tostring(values[valueId])
+	end)
+
+	return container
+end
+
+function Tab:AddInputBox(text, valueId, default)
+	local values = self.Window.Values
+	if values[valueId] == nil then
+		values[valueId] = default or ""
+	end
+
+	local container, box = self:_buildInputBase("InputBox_" .. tostring(valueId), text, tostring(values[valueId]), nil)
+
+	box.FocusLost:Connect(function()
+		values[valueId] = box.Text
+	end)
+
+	return container
+end
+
+Tab.SliderInfo = {
+	Min = 0,
+	Max = 100,
+	Step = 1,
+	DefaultValue = 0,
+	updateThread = nil, 
+}
+
+function Tab:AddSlider(text, valueId, SliderInfo)
+	SliderInfo = SliderInfo or {}
+	local minValue = SliderInfo.Min or 0
+	local maxValue = SliderInfo.Max or 100
+	local step = SliderInfo.Step or 1
+	local updateThread = SliderInfo.updateThread
+
+	local values = self.Window.Values
+	if values[valueId] == nil then
+		values[valueId] = math.clamp(SliderInfo.DefaultValue or minValue, minValue, maxValue)
+	end
+
+	self._componentCount = self._componentCount + 1
+	local container = newComponentContainer(self.Page, "Slider_" .. tostring(valueId), 40, self._componentCount)
+	local bar = newDarkCard(container)
+
+	newGradientText(bar, {
+		Name = "TextLabel",
+		Size = UDim2.new(0.4, 0, 1, 0),
+		Position = UDim2.new(0.03, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		Text = text,
+		TextSize = 15,
+		TextXAlignment = Enum.TextXAlignment.Left,
+	})
+
+	local sliderTrack = create("CanvasGroup", {
+		Name = "SliderTrack",
+		Size = UDim2.new(0.5, 0, 0.85, 0),
+		Position = UDim2.new(0.97, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(1, 0.5),
+		BackgroundColor3 = Color3.fromRGB(35, 35, 45),
+		BorderSizePixel = 0,
+		Parent = bar,
+	})
+	addCorner(sliderTrack, UDim.new(1, 0))
+	addPlainStroke(sliderTrack, THEME.ComponentStrokeThickness, THEME.ComponentStrokeColor)
+
+	local sliderFill = create("Frame", {
+		Name = "SliderFill",
+		Size = UDim2.new(0, 0, 1, 0),
+		BackgroundColor3 = THEME.TogglePillColor or Color3.fromRGB(0, 170, 255),
+		BorderSizePixel = 0,
+		ZIndex = 1,
+		Parent = sliderTrack,
+	})
+	addCorner(sliderFill, UDim.new(0, 100))
+	addGradient(sliderFill, 0, THEME.WindowDarkGradient)
+	sliderFill.Size = UDim2.new((values[valueId] - minValue) / (maxValue - minValue), 0, 1, 0)
+
+	local valueLabel = newGradientText(sliderTrack, {
+		Name = "ValueLabel",
+		Size = UDim2.new(1, 0, 1, 0),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Text = tostring(values[valueId]),
+		TextSize = 18,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		ZIndex = 3,
+	})
+
+	local sliderButton = create("TextButton", {
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundTransparency = 1,
+		Text = "",
+		ZIndex = 5,
+		Parent = sliderTrack,
+	})
+
+	local dragging = false
+
+	local function setSliderValue(rawVal, triggerUpdate)
+		local steppedVal = math.floor((rawVal / step) + 0.5) * step
+		local clampedVal = math.clamp(steppedVal, minValue, maxValue)
+
+		values[valueId] = clampedVal
+		valueLabel.Text = tostring(clampedVal)
+
+		local percent = math.clamp((clampedVal - minValue) / (maxValue - minValue), 0, 1)
+		TweenService:Create(sliderFill, TWEEN_INFO, { Size = UDim2.new(percent, 0, 1, 0) }):Play()
+
+		if triggerUpdate and updateThread then
+			if typeof(updateThread) == "function" then
+				task.spawn(updateThread, clampedVal)
+			elseif typeof(updateThread) == "thread" then
+				task.spawn(updateThread)
+			end
+		end
+	end
+
+	local function updateSliderFromInput(input)
+		local percent = math.clamp((input.Position.X - sliderTrack.AbsolutePosition.X) / sliderTrack.AbsoluteSize.X, 0, 1)
+		local calculatedValue = minValue + ((maxValue - minValue) * percent)
+		setSliderValue(calculatedValue, true)
+	end
+
+	setSliderValue(values[valueId], false)
+
+	sliderButton.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			sfxclick:Play()
+			updateSliderFromInput(input)
+		end
+	end)
+
+	sliderButton.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			updateSliderFromInput(input)
+		end
+	end)
+
+	return container
+end
+
+local Window = {}
+Window.__index = Window
+
+function Window:AddTab(name)
+	self._tabCount = self._tabCount + 1
+
+	local tabBase = create("Frame", {
+		Name = "Tab_Base",
+		Size = UDim2.new(1, 0, 0.150, 0),
+		Position = UDim2.new(0.5, 0, 0.075, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		LayoutOrder = self._tabCount,
+		Parent = self.TabScroll,
+	})
+
+	local btn = create("ImageButton", {
+		Name = "ImageButton",
+		Size = UDim2.new(0.950, 0, 0.950, 0),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 0,
+		BorderSizePixel = 0,
+		Image = THEME.PlaceholderImage,
+		ImageColor3 = Color3.fromRGB(255, 255, 255),
+		ScaleType = Enum.ScaleType.Stretch,
+		AutoButtonColor = false,
+		Parent = tabBase,
+	})
+	addGradientStroke(btn, THEME.StrokeThickness, THEME.StrokeColor, 26, THEME.AccentGradient)
+	addGradient(btn, -109, THEME.WindowDarkGradient)
+	addCorner(btn, UDim.new(0, 8)) 
+
+	local label = create("TextLabel", {
+		Name = "TextLabel",
+		Size = UDim2.new(0.668, 0, 1, 0),
+		Position = UDim2.new(0.334, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Text = name,
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextSize = 14,
+		Font = THEME.Font,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextYAlignment = Enum.TextYAlignment.Center,
+		Parent = btn,
+	})
+	addGradient(label, 26, THEME.TabTextGradient)
+
+	local page = create("ScrollingFrame", {
+		Name = "Page_" .. name,
+		Size = UDim2.new(0.979, 0, 1, 0),
+		Position = UDim2.new(0.489, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Visible = false,
+		Parent = self.Container,
+	})
+	makeAutoScrollingFrame(page) 
+
+	local tabObject = setmetatable({
+		Window = self,
+		Page = page,
+		Button = btn,
+		_componentCount = 0,
+	}, Tab)
+
+	btn.MouseButton1Click:Connect(function()
+		sfxclick:Play()
+		self:SelectTab(tabObject)
+	end)
+
+	table.insert(self.Tabs, tabObject)
+
+	if not self.CurrentTab then
+		self:SelectTab(tabObject)
+	end
+
+	return tabObject
+end
+
+function Window:SelectTab(tabObject)
+	if self.CurrentTab then
+		self.CurrentTab.Page.Visible = false
+	end
+	self.CurrentTab = tabObject
+	tabObject.Page.Visible = true
+end
+
+function Window:Destroy()
+	self.ScreenGui:Destroy()
+end
+
+local Glib = {}
+Glib.__index = Glib
+Glib.Config = {Theme = THEME, Title = "GLIB", Size = UDim2.new(0.400, 0, 0.400, 0), ClickSound = true, ClickVolume = 2, DiscordLink = ""}
+
+function Glib:Window(config)
+	config = config or {}
+	local title = config.Title or "Window"
+	local size = config.Size or UDim2.new(0.400, 0, 0.400, 0)
+	local discordLink = config.DiscordLink or ""
+
+	local screenGui = create("ScreenGui", {
+		Name = "ScreenGui",
+		ResetOnSpawn = false,
+		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+		Parent = PlayerGui,
+	})
+	addCorner(screenGui, UDim.new(0, 8)) 
+
+	local main = create("Frame", {
+		Name = "Glib",
+		Size = size,
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = THEME.WindowBackground,
+		BackgroundTransparency = 0,
+		BorderSizePixel = 0,
+		ZIndex = 999999,
+		Parent = screenGui,
+	})
+	addShadow(main)
+	addPlainStroke(main, THEME.StrokeThickness, THEME.OuterStrokeColor) 
+
+	local top = create("Frame", {
+		Name = "Top",
+		Size = UDim2.new(1, 0, 0.1, 0),
+		Position = UDim2.new(0.5, 0, 0, 0),
+		AnchorPoint = Vector2.new(0.5, 0),
+		BackgroundColor3 = THEME.TopBarColor,
+		BackgroundTransparency = 0,
+		BorderSizePixel = 0,
+		ZIndex = 1,
+		Parent = main,
+	})
+	addGradientStroke(top, THEME.StrokeThickness, THEME.StrokeColor, -84, THEME.AccentGradient)
+	addCorner(top, UDim.new(0.15, 0))
+
+	create("TextLabel", {
+		Name = "TitleLabel",
+		Size = UDim2.new(0.7, 0, .9, 0),
+		Position = UDim2.new(0.35, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundTransparency = 1,
+		Text = title,
+		TextColor3 = THEME.TextColor,
+		Font = THEME.Font,
+		TextScaled = true,
+		Parent = top,
+	})
+	
+	local discordbtn = create("ImageButton",  {
+		Name = "DiscordButton",
+		Size = UDim2.new(0.2, 0, .6, 0),
+		Position = UDim2.new(0.9, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundTransparency = 1,
+		Image = "rbxassetid://16584754883",
+		ScaleType = Enum.ScaleType.Fit,
+		ZIndex = 1,
+		Parent = top,
+	})
+	
+	discordbtn.MouseButton1Click:Connect(function()
+		if discordLink ~= "" then
+			sfxclick:Play()
+			local success, result = pcall(function()
+				setclipboard(discordLink)
+				warn("Copied")
+			end)
+		end
+	end)
+	
+
+	makeDraggable(top, main)
+
+	local low = create("Frame", {
+		Name = "low",
+		Size = UDim2.new(1, 0, 0.897, 0),
+		Position = UDim2.new(0.5, 0, 0.545, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ZIndex = 1,
+		Parent = main,
+	})
+
+	local sideTabs = create("Frame", {
+		Name = "SideTabs",
+		Size = UDim2.new(0.292, 0, 0.975, 0),
+		Position = UDim2.new(0.146, 0, 0.514, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = THEME.SideTabsColor,
+		BackgroundTransparency = THEME.SideTabsTransparency,
+		BorderSizePixel = 0,
+		ZIndex = 1,
+		Parent = low,
+	})
+	addGradientStroke(sideTabs, THEME.StrokeThickness, THEME.StrokeColor, 26, THEME.AccentGradient)
+	addCorner(sideTabs, UDim.new(0, 8))  
+
+	local tabScroll = create("ScrollingFrame", {
+		Name = "ScrollingFrame",
+		Size = UDim2.new(1, 0, 1, 0),
+		Position = UDim2.new(0.5, 0, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ZIndex = 1,
+		Parent = sideTabs,
+	})
+	makeAutoScrollingFrame(tabScroll, { Padding = UDim.new(0, 4) })
+
+	local container = create("Frame", {
+		Name = "Container",
+		Size = UDim2.new(0.685, 0, 0.976, 0),
+		Position = UDim2.new(0.653, 0, 0.512, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ZIndex = 1,
+		Parent = low,
+	})
+
+	addGradient(main, -51, THEME.WindowDarkGradient)
+	addCorner(main, UDim.new(0, 8))
+
+	local windowObj = setmetatable({}, Window)
+	windowObj.ScreenGui = screenGui
+	windowObj.Main = main
+	windowObj.TabScroll = tabScroll
+	windowObj.Container = container
+	windowObj.Tabs = {}
+	windowObj.Values = {}
+	windowObj._tabCount = 0
+	windowObj.CurrentTab = nil
+	
+	sfxclick = Instance.new("Sound")
+	sfxclick.SoundId = "rbxassetid://139719503904449"
+	sfxclick.Volume = config.ClickVolume
+	sfxclick.Parent = script
+	if not config.ClickSound then
+		sfxclick.Volume = 0
+	end
+	
+
+	return windowObj
+end
+
+return Glib
